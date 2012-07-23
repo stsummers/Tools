@@ -22,6 +22,10 @@ private:
   
   double CurrentAzim;
   double CurrentElev;
+
+  int inverted;
+  double TranslateX;
+  double TranslateY;
   
   void Initialize();
   void ComputeCoords(const Vector3d &P, const Vector3d &A, const Vector3d &U);

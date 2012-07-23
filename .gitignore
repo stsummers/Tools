@@ -3,4 +3,6 @@ ipch/*
 *.swp
 *.opensdf
 *.sdf
+*.suo
+*.*~
 
