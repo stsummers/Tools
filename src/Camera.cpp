@@ -1,4 +1,3 @@
-
 #include "Camera.h"
 
 #ifdef __APPLE__
@@ -29,82 +28,6 @@ int CameraMode = INACTIVE;
 
 Vector3d PrevMousePos;
 
-//
-// Rotation routines - regular functions, not methods
-//
-
-void RotateX(Vector3d &v, double degree){
-  double c = cos(DegToRad(degree));
-  double s = sin(DegToRad(degree));
-  double v1 = v[1] * c - v[2] * s;
-  double v2 = v[1] * s + v[2] * c;
-  v[1] = v1; v[2] = v2;
-}
-
-void RotateY(Vector3d &v, double degree){
-  double c = cos(DegToRad(degree));
-  double s = sin(DegToRad(degree));
-  double v0 = v[0] * c + v[2] * s;
-  double v2 = -v[0] * s + v[2] * c;
-  v[0] = v0; v[2] = v2;
-}
-
-/*
- * ArbitraryRotate() - rotate around an arbitrary coordinate system 
-specified by
- *                     U, V, & W
- */
-void ArbitraryRotate(Vector3d U, Vector3d V, Vector3d W, double degreeX, 
-double degreeY, Vector3d& point, Vector3d aim) {
-  double cx = cos(DegToRad(degreeX));
-  double sx = sin(DegToRad(degreeX));
-  double cy = cos(DegToRad(degreeY));
-  double sy = sin(DegToRad(degreeY));
-
-  Matrix4x4 trans(1, 0, 0, -aim[0],
-                  0, 1, 0, -aim[1],
-                  0, 0, 1, -aim[2],
-                  0, 0, 0, 1);
-
-  Matrix4x4 mat(U[0], U[1], U[2], 0,
-                V[0], V[1], V[2], 0,
-                W[0], W[1], W[2], 0,
-                0, 0, 0, 1);
-
-  Matrix4x4 rot;
-  Vector4d pos(point[0], point[1], point[2], 1);
-
-  pos = trans*pos;
-    cout << "after trans: "<<pos[0]<<", "<<pos[1]<<", "<<pos[2]<<endl;
-
-  pos = mat*pos;
-    cout << "after mat: "<<pos[0]<<", "<<pos[1]<<", "<<pos[2]<<endl;
-
-  rot.set(1,   0,  0, 0,
-          0,  cx, sx, 0,
-          0, -sx, cx, 0,
-          0,   0,  0, 1);
-
-  pos = rot*pos;
-    cout << "after rotX: "<<pos[0]<<", "<<pos[1]<<", "<<pos[2]<<endl;
-
-  rot.set( cy, 0, sy, 0,
-          0, 1,  0, 0,
-          -sy, 0, cy, 0,
-          0, 0,  0, 1);
-
-  pos = rot*pos;
-    cout << "after rotY: "<<pos[0]<<", "<<pos[1]<<", "<<pos[2]<<endl;
-  pos = mat.inv()*pos;
-    cout << "after mat inverse: "<<pos[0]<<", "<<pos[1]<<", "<<pos[2]<<endl;
-  pos = trans.inv()*pos;
-    cout << "after trans inverse: "<<pos[0]<<", "<<pos[1]<<", "<<pos[2]<<endl;
-  point.set(pos[0], pos[1], pos[2]);
-}
-
-//
-// Private Helper Methods
-//
 
 // set camera position, aim point, and up vector. verify ok, and make up the true up direction
 void Camera::ComputeCoords(const Vector3d &P, const Vector3d &A, const Vector3d &U){
@@ -166,6 +89,7 @@ void Camera::Initialize() {
   inverted = 0;
   TranslateX = 0;
   TranslateY = 0;
+  Zoom = 0;
 }
 
 /* constructors */
@@ -275,16 +199,17 @@ void Camera::PerspectiveDisplay(int W, int H) {
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
 
+  Fov = min (max(30.0 + Zoom, 1.0), 179.0);
   gluPerspective(Fov, (float) W/(float) H, NearPlane, FarPlane);
-  gluLookAt(0, 0, 27, 0, 0, 0, 0, 1, 0);
+  gluLookAt(0, 5, 50, 0, 0, 0, 0, 1, 0);
 
 
 /*  gluLookAt(Pos.x, Pos.y, Pos.z,
             Aim.x, Aim.y, Aim.z,
             Up.x, Up.y, Up.z);*/
 
-//  glTranslatef (TranslateX, 0.0, 0.0);
-//  glTranslatef (0.0, -TranslateY, 0.0);
+  glTranslatef (TranslateX, 0.0, 0.0);
+  glTranslatef (0.0, -TranslateY, 0.0);
 
   glRotatef(CurrentElev, 1, 0, 0);
   glRotatef(CurrentAzim, 0, 1, 0);
@@ -389,18 +314,7 @@ void Camera::HandleMouseMotion(int x, int y) {
     switch (CameraMode) {
       case ZOOM:
         // camera is zooming in
-        z = (double) d / 100.0;
-
-        dir = Aim - Pos;
-
-        if (dir.norm() < 0.1 && z > 0) {
-          // move the aim position too when you get in really close
-          z *= 10.0;
-          Aim = Aim + z*dir;
-        }
-
-        // update the new position
-        Pos = Pos + z * dir;
+        Zoom -= (double) d * 0.05;
         break;
       case ROTATE:
         // camera is rotating
@@ -425,63 +339,14 @@ void Camera::HandleMouseMotion(int x, int y) {
         while (CurrentElev > 180)
           CurrentElev -= 360;
 
-
-        // get rate of change in screen coordinate from prev mouse pos
-/*        LocalDeltaAzim = ((double) mouse_dx)  / 5.0;
-        LocalDeltaElev = ((double) mouse_dy) / 5.0;
-
-        // rotate the window coordinate system by the rate of change
-        // from the onset of the mouse event
-
-        // got this small section of code from Dr. House
-        WindowX.set(1, 0, 0);
-        WindowY.set(0, 1, 0);
-
-        RotateX(WindowX, CurrentElev + DeltaElev);
-        RotateY(WindowX, CurrentAzim + DeltaAzim);
-        WindowX.z = -WindowX.z;
-
-        RotateX(WindowY, CurrentElev+DeltaElev);
-        RotateY(WindowY, CurrentAzim+DeltaAzim);
-        WindowY.z = -WindowY.z;
-
-        WindowZ = (WindowX % WindowY).normalize();
-
-
-        ArbitraryRotate(WindowX, WindowY, WindowZ,
-                        LocalDeltaElev, 0, Pos, Aim);
-
-        ArbitraryRotate(Vector3d(1, 0, 0), Vector3d(0, 1, 0),
-                        Vector3d(0, 0, 1), 0, -LocalDeltaAzim, Pos, Aim);
-
-        Up = WindowY.normalize();*/
-
         break;
       case TRANSLATE:
-        // camera is translating
 
-        realy = ViewPort[3] - y - 1;
-
-        gluProject(Aim.x, Aim.y, Aim.z,
-                   MvMatrix, ProjMatrix, ViewPort,
-                   &wx, &wy, &wz);
-
-        gluUnProject((GLdouble) x, (GLdouble) realy, wz,
-                     MvMatrix, ProjMatrix, ViewPort,
-                     &MousePos.x, &MousePos.y, &MousePos.z);
-
-        // move both the camera position and its aim coordinate
-        dir = MousePos - PrevMousePos;
-        Pos = Pos - dir;
-        Aim = Aim - dir;
-
-        PrevMousePos = MousePos;
-
-/*        TranslateX += ((double) (x - MouseStartX)) * 0.05;
+        TranslateX += ((double) (x - MouseStartX)) * 0.05;
         TranslateY += ((double) (y - MouseStartY)) * 0.05; 
 
         MouseStartX = x;
-        MouseStartY = y;*/
+        MouseStartY = y;
         break;
     }
 
@@ -498,6 +363,4 @@ const Camera& Camera::operator=(const Camera& Cam) {
 
   return *this;
 }
-
-
 
