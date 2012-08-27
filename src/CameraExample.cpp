@@ -99,6 +99,7 @@ void PerspDisplay() {
 void mouseEventHandler(int button, int state, int x, int y) {
   // let the camera handle some specific mouse events (similar to maya)
   camera->HandleMouseEvent(button, state, x, y);
+  glutPostRedisplay();
 }
 
 void motionEventHandler(int x, int y) {
