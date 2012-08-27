@@ -283,6 +283,14 @@ void Camera::HandleMouseEvent(int button, int state, int x, int y) {
         // zooming camera:
         CameraMode = ZOOM;
         break;
+        
+      // scroll MMB
+      case 3:
+        Zoom -= 0.5;
+        break;
+      case 4:
+        Zoom += 0.5;
+        break;
     }
   }
 }
@@ -313,7 +321,7 @@ void Camera::HandleMouseMotion(int x, int y) {
 
     switch (CameraMode) {
       case ZOOM:
-        // camera is zooming in
+        // camera is zooming in or out
         Zoom -= (double) d * 0.05;
         break;
       case ROTATE:
